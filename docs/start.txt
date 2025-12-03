@@ -1,0 +1,321 @@
+
+----------------------------------------------------
+
+docker login
+
+
+cd docker/cdc-kafka-connect/
+
+ls -la
+
+    Dockerfile
+    dockerizar-kafka-connect.sh
+    novos-voos-conector-backup.json
+    novos-voos-conector.json
+    novos-voos-conector-remover.sh
+    novos-voos-conector.sh
+
+./dockerizar-kafka-connect.sh
+
+
+
+docker image ls
+
+    IMAGE                           ID                 DISK USAGE      CONTENT SIZE     EXTRA
+    dc-kafka-connect:latest         672a3f687f19       1.68GB          0B
+
+
+
+
+cd docker/
+
+./infra-up.sh
+
+    Subindo a infra da aplicação...
+    [+] Running 51/51
+     ✔ zookeeper Pulled                                                                                                                                                                                                                                     16.7s
+     ✔ kafka Pulled                                                                                                                                                                                                                                         61.0s
+     ✔ mongodb Pulled                                                                                                                                                                                                                                       35.8s
+     ✔ redpanda Pulled                                                                                                                                                                                                                                      42.6s
+     ✔ criador-topicos Pulled                                                                                                                                                                                                                               23.1s
+    [+] Running 7/7
+     ✔ Network bubble             Created                                                                                                                                                                                                                    0.5s
+     ✔ Container zookeeper        Started                                                                                                                                                                                                                   17.1s
+     ✔ Container mongodb          Started                                                                                                                                                                                                                   17.0s
+     ✔ Container kafka            Started                                                                                                                                                                                                                    1.1s
+     ✔ Container criador-topicos  Started                                                                                                                                                                                                                    1.4s
+     ✔ Container kafka-connect    Started                                                                                                                                                                                                                    1.5s
+     ✔ Container redpanda         Started                                                                                                                                                                                                                    1.7s
+    Removendo conteiner criador-topicos...
+    criador-topicos
+    Instalando conectores no kafka connect...
+    {"name":"novos-voos-conector","config":{"connector.class":"io.debezium.connector.mongodb.MongoDbConnector",
+    "mongodb.connection.string":"mongodb://mongodb:27017","mongodb.user":"user","mongodb.password":"password",
+    "database.include.list":"livro-kafka","collection.include.list":"livro-kafka.voos","key.converter":
+    "org.apache.kafka.connect.json.JsonConverter","key.converter.schemas.enable":"false","skipped.operations":
+    "u,d,t","topic.prefix":"ms-companhias-aereas","name":"novos-voos-conector"},"tasks":[],"type":"source"}
+
+
+
+docker compose ps
+
+    NAME            IMAGE                                             COMMAND                   SERVICE         CREATED         STATUS                   PORTS
+    kafka           confluentinc/cp-server:7.3.3                      "/etc/confluent/dock…"    kafka           3 minutes ago   Up 3 minutes             0.0.0.0:9092->9092/tcp, [::]:9092->9092/tcp, 0.0.0.0:29092->9092/tcp, [::]:29092->9092/tcp
+    kafka-connect   cdc-kafka-connect                                 "bash -c 'echo \">>>>…"   kafka-connect   3 minutes ago   Up 3 minutes (healthy)   0.0.0.0:8083->8083/tcp, [::]:8083->8083/tcp, 9092/tcp
+    mongodb         mongo:4.2                                         "docker-entrypoint.s…"    mongodb         3 minutes ago   Up 3 minutes (healthy)   0.0.0.0:27017->27017/tcp, [::]:27017->27017/tcp
+    redpanda        docker.redpanda.com/redpandadata/console:v2.3.0   "/bin/sh -c 'echo \"$…"   redpanda        3 minutes ago   Up 3 minutes             0.0.0.0:18080->8080/tcp, [::]:18080->8080/tcp
+    zookeeper       zookeeper:3.5                                     "/docker-entrypoint.…"    zookeeper       3 minutes ago   Up 3 minutes             2888/tcp, 3888/tcp, 0.0.0.0:2181->2181/tcp, [::]:2181->2181/tcp, 8080/tcp
+
+
+----------------------------------------------------
+
+
+* verificar se o kafka connect esta rodando:
+
+    curl http://localhost:8083
+
+        {"version":"7.4.1-ccs","commit":"fed9c006bfc7ba5bf7d2dee840e041d1a851d903","kafka_cluster_id":"YCCbExfBSrqvX_FRnovnvw"}docker ❯
+
+
+
+* verificar se o conector "novos-voos-connector" foi criado,
+  usando o kafka connect rest api:
+
+    curl -X GET http://localhost:8083/connectors
+
+        ["novos-voos-conector"]
+
+
+    curl -X GET http://localhost:8083/connectors/novos-voos-conector
+
+        {
+            "name":"novos-voos-conector",
+            "config":{
+                "connector.class":"io.debezium.connector.mongodb.MongoDbConnector",
+                "key.converter.schemas.enable":"false",
+                "collection.include.list":"livro-kafka.voos",
+                "topic.prefix":"ms-companhias-aereas",
+                "mongodb.connection.string":"mongodb://mongodb:27017",
+                "mongodb.password":"password",
+                "mongodb.user":"user",
+                "name":"novos-voos-conector",
+                "skipped.operations":"u,d,t",
+                "key.converter":"org.apache.kafka.connect.json.JsonConverter",
+                "database.include.list":"livro-kafka"
+            },
+            "tasks":[
+                {
+                    "connector":"novos-voos-conector",
+                    "task":0
+                }
+            ],
+            "type":"source"
+        }
+
+
+
+* verificar se o kafka esta rodando:
+
+    curl -X GET localhost:9092
+
+        curl: (52) Empty reply from server
+
+
+
+
+* verificar se o mongodb esta rodando:
+
+    curl localhost:27017
+
+        It looks like you are trying to access MongoDB over HTTP on the native driver port
+
+
+
+
+* verificar se o zookeeper esta rodando:
+
+    curl localhost:2181
+
+        Empty reply from server
+
+
+
+
+* verificar se o redpanda esta rodando:
+
+    curl localhost:18080
+
+
+
+
+
+----------------------------------------------------
+
+      TESTANDO A SOLUÇÃO
+
+
+* rodar a aplicação "ms-companhias-aereas":
+
+    cd ms-companhias-aereas/
+
+    ./mvnw -f pom.xml compile spring-boot:start
+
+
+        [INFO] Scanning for projects...
+        [INFO]
+        [INFO] -----------------< br.com.alura:ms-companhias-aereas >------------------
+        [INFO] Building ms-companhias-aereas 0.0.1-SNAPSHOT
+        [INFO]   from pom.xml
+        [INFO] --------------------------------[ jar ]---------------------------------
+        [INFO]
+        [INFO] --- resources:3.3.1:resources (default-resources) @ ms-companhias-aereas ---
+        [INFO] Copying 1 resource from src/main/resources to target/classes
+        [INFO] Copying 0 resource from src/main/resources to target/classes
+        [INFO]
+        [INFO] --- compiler:3.11.0:compile (default-compile) @ ms-companhias-aereas ---
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-component-annotations/1.5.5/plexus-component-annotations-1.5.5.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-component-annotations/1.5.5/plexus-component-annotations-1.5.5.jar (4.2 kB at 26 kB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-java/1.1.2/plexus-java-1.1.2.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.4/asm-9.4.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-api/2.13.0/plexus-compiler-api-2.13.0.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/3.5.0/plexus-utils-3.5.0.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-manager/2.13.0/plexus-compiler-manager-2.13.0.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-java/1.1.2/plexus-java-1.1.2.jar (55 kB at 614 kB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-javac/2.13.0/plexus-compiler-javac-2.13.0.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-manager/2.13.0/plexus-compiler-manager-2.13.0.jar (4.7 kB at 36 kB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-javac/2.13.0/plexus-compiler-javac-2.13.0.jar (23 kB at 136 kB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-api/2.13.0/plexus-compiler-api-2.13.0.jar (27 kB at 129 kB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.4/asm-9.4.jar (122 kB at 549 kB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/3.5.0/plexus-utils-3.5.0.jar (267 kB at 1.0 MB/s)
+        [INFO] Changes detected - recompiling the module! :source
+        [INFO] Compiling 13 source files with javac [debug release 21] to target/classes
+        [INFO] Annotation processing is enabled because one or more processors were found
+          on the class path. A future release of javac may disable annotation processing
+          unless at least one processor is specified by name (-processor), or a search
+          path is specified (--processor-path, --processor-module-path), or annotation
+          processing is enabled explicitly (-proc:only, -proc:full).
+          Use -Xlint:-options to suppress this message.
+          Use -proc:none to disable annotation processing.
+        [INFO]
+        [INFO] --- spring-boot:3.2.2:start (default-cli) @ ms-companhias-aereas ---
+        Downloading from central: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-buildpack-platform/3.2.2/spring-boot-buildpack-platform-3.2.2.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-buildpack-platform/3.2.2/spring-boot-buildpack-platform-3.2.2.jar (272 kB at 2.7 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.14.2/jackson-databind-2.14.2.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.14.2/jackson-annotations-2.14.2.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.14.2/jackson-core-2.14.2.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.23.0/commons-compress-1.23.0.jar
+        Downloading from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/module/jackson-module-parameter-names/2.14.2/jackson-module-parameter-names-2.14.2.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.14.2/jackson-annotations-2.14.2.jar (77 kB at 1.2 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.2.3/httpclient5-5.2.3.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/module/jackson-module-parameter-names/2.14.2/jackson-module-parameter-names-2.14.2.jar (9.5 kB at 146 kB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5/5.2.4/httpcore5-5.2.4.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.23.0/commons-compress-1.23.0.jar (1.1 MB at 9.9 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5-h2/5.2.4/httpcore5-h2-5.2.4.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.14.2/jackson-core-2.14.2.jar (459 kB at 4.1 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/springframework/spring-core/6.0.10/spring-core-6.0.10.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.14.2/jackson-databind-2.14.2.jar (1.6 MB at 11 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/springframework/spring-jcl/6.0.10/spring-jcl-6.0.10.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5-h2/5.2.4/httpcore5-h2-5.2.4.jar (237 kB at 1.6 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-loader-tools/3.2.2/spring-boot-loader-tools-3.2.2.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.2.3/httpclient5-5.2.3.jar (843 kB at 4.2 MB/s)
+        Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/1.5.8/plexus-utils-1.5.8.jar
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/springframework/spring-jcl/6.0.10/spring-jcl-6.0.10.jar (24 kB at 116 kB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-loader-tools/3.2.2/spring-boot-loader-tools-3.2.2.jar (434 kB at 2.0 MB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/springframework/spring-core/6.0.10/spring-core-6.0.10.jar (1.8 MB at 7.9 MB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5/5.2.4/httpcore5-5.2.4.jar (855 kB at 3.5 MB/s)
+        Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/1.5.8/plexus-utils-1.5.8.jar (268 kB at 1.1 MB/s)
+        [INFO] Attaching agents: []
+
+          .   ____          _            __ _ _
+         /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+        ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+         \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+          '  |____| .__|_| |_|_| |_\__, | / / / /
+         =========|_|==============|___/=/_/_/_/
+         :: Spring Boot ::                (v3.2.2)
+
+        2025-12-03T19:51:47.064-03:00  INFO 578254 --- [           main] b.c.a.m.MsCompanhiasAereasApplication    : Starting MsCompanhiasAereasApplication using Java 21.0.4 with PID 578254 (/home/wolf/Documentos/desenvolvimento/casa-do-codigo/kafka-connect-kafka-streams/ms-companhias-aereas/target/classes started by wolf in /home/wolf/Documentos/desenvolvimento/casa-do-codigo/kafka-connect-kafka-streams/ms-companhias-aereas)
+        2025-12-03T19:51:47.070-03:00  INFO 578254 --- [           main] b.c.a.m.MsCompanhiasAereasApplication    : No active profile set, falling back to 1 default profile: "default"
+        2025-12-03T19:51:47.945-03:00  INFO 578254 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data MongoDB repositories in DEFAULT mode.
+        2025-12-03T19:51:48.044-03:00  INFO 578254 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 92 ms. Found 1 MongoDB repository interface.
+        2025-12-03T19:51:48.869-03:00  INFO 578254 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+        2025-12-03T19:51:48.892-03:00  INFO 578254 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+        2025-12-03T19:51:48.892-03:00  INFO 578254 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.18]
+        2025-12-03T19:51:48.954-03:00  INFO 578254 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+        2025-12-03T19:51:48.954-03:00  INFO 578254 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1803 ms
+        2025-12-03T19:51:49.240-03:00  INFO 578254 --- [           main] org.mongodb.driver.client                : MongoClient with metadata {"driver": {"name": "mongo-java-driver|sync|spring-boot", "version": "4.11.1"}, "os": {"type": "Linux", "name": "Linux", "architecture": "amd64", "version": "6.14.0-36-generic"}, "platform": "Java/Eclipse Adoptium/21.0.4+7-LTS"} created with settings MongoClientSettings{readPreference=primary, writeConcern=WriteConcern{w=null, wTimeout=null ms, journal=null}, retryWrites=true, retryReads=true, readConcern=ReadConcern{level=null}, credential=MongoCredential{mechanism=null, userName='user', source='livro-kafka', password=<hidden>, mechanismProperties=<hidden>}, transportSettings=null, streamFactoryFactory=null, commandListeners=[], codecRegistry=ProvidersCodecRegistry{codecProviders=[ValueCodecProvider{}, BsonValueCodecProvider{}, DBRefCodecProvider{}, DBObjectCodecProvider{}, DocumentCodecProvider{}, CollectionCodecProvider{}, IterableCodecProvider{}, MapCodecProvider{}, GeoJsonCodecProvider{}, GridFSFileCodecProvider{}, Jsr310CodecProvider{}, JsonObjectCodecProvider{}, BsonCodecProvider{}, EnumCodecProvider{}, com.mongodb.client.model.mql.ExpressionCodecProvider@760487aa, com.mongodb.Jep395RecordCodecProvider@1526f71, com.mongodb.KotlinCodecProvider@49ca94a9]}, loggerSettings=LoggerSettings{maxDocumentLength=1000}, clusterSettings={hosts=[localhost:27017], srvServiceName=mongodb, mode=SINGLE, requiredClusterType=UNKNOWN, requiredReplicaSetName='null', serverSelector='null', clusterListeners='[]', serverSelectionTimeout='30000 ms', localThreshold='15 ms'}, socketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=0, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, heartbeatSocketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=10000, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, connectionPoolSettings=ConnectionPoolSettings{maxSize=100, minSize=0, maxWaitTimeMS=120000, maxConnectionLifeTimeMS=0, maxConnectionIdleTimeMS=0, maintenanceInitialDelayMS=0, maintenanceFrequencyMS=60000, connectionPoolListeners=[], maxConnecting=2}, serverSettings=ServerSettings{heartbeatFrequencyMS=10000, minHeartbeatFrequencyMS=500, serverListeners='[]', serverMonitorListeners='[]'}, sslSettings=SslSettings{enabled=false, invalidHostNameAllowed=false, context=null}, applicationName='null', compressorList=[], uuidRepresentation=JAVA_LEGACY, serverApi=null, autoEncryptionSettings=null, dnsClient=null, inetAddressResolver=null, contextProvider=null}
+        2025-12-03T19:51:49.267-03:00  INFO 578254 --- [localhost:27017] org.mongodb.driver.cluster               : Monitor thread successfully connected to server with description ServerDescription{address=localhost:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, minWireVersion=0, maxWireVersion=8, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=30, roundTripTimeNanos=28502440, setName='rs0', canonicalAddress=mongodb:27017, hosts=[mongodb:27017], passives=[], arbiters=[], primary='mongodb:27017', tagSet=TagSet{[]}, electionId=7fffffff0000000000000001, setVersion=1, topologyVersion=null, lastWriteDate=Wed Dec 03 19:51:41 BRT 2025, lastUpdateTimeNanos=424265290143171}
+        2025-12-03T19:51:50.086-03:00  INFO 578254 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path ''
+        2025-12-03T19:51:50.100-03:00  INFO 578254 --- [           main] b.c.a.m.MsCompanhiasAereasApplication    : Started MsCompanhiasAereasApplication in 3.566 seconds (process running for 4.439)
+        [INFO] ------------------------------------------------------------------------
+        [INFO] BUILD SUCCESS
+        [INFO] ------------------------------------------------------------------------
+        [INFO] Total time:  10.338 s
+        [INFO] Finished at: 2025-12-03T19:51:50-03:00
+        [INFO] ------------------------------------------------------------------------
+
+
+
+
+
+* cadastrar um novo voo:
+
+    curl --location 'http://localhost:8080/voos' \
+    --header 'Content-Type: application/json' \
+    --data '{
+    "origem":"CGH",
+    "partida":"2024-08-14T18:38:39.072390",
+    "destino":"SDU",
+    "chegada":"2024-08-14T20:38:39.072451",
+    "companhiaAerea":"GOL",
+    "precoAdulto": 1000.00,
+    "precoCrianca": 500.00
+    }'
+
+
+        2025-12-03T19:56:35.440-03:00  INFO 578254 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+        2025-12-03T19:56:35.440-03:00  INFO 578254 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+        2025-12-03T19:56:35.442-03:00  INFO 578254 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+
+
+
+
+
+
+
+
+* verificar no banco mongodb com a ferramenta dbschema:
+
+
+
+
+* verificar nos topicos kafka com a ferramenta redpanda:
+
+
+
+----------------------------------------------------
+
+
+
+----------------------------------------------------
+
+
+
+
+----------------------------------------------------
+
+
+
+
+----------------------------------------------------
+
+
+
+----------------------------------------------------
+
+
+
+
+
+
+
