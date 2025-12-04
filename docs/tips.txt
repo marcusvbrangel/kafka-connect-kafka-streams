@@ -1,0 +1,21 @@
+
+Para matar um processo que está rodando na porta 8080 no Linux, você pode usar o seguinte comando:
+
+  lsof -ti:8080 | xargs kill -9
+
+  Ou alternativamente:
+
+  fuser -k 8080/tcp
+
+  Você quer que eu execute um desses comandos para liberar a porta 8080?
+
+  Explicação dos comandos:
+
+  1. lsof -ti:8080 | xargs kill -9
+    - lsof -ti:8080 - Lista o PID do processo usando a porta 8080
+    - xargs kill -9 - Força o encerramento do processo
+  2. fuser -k 8080/tcp
+    - Mata diretamente o processo usando a porta 8080/tcp
+
+  Se quiser apenas ver qual processo está usando a porta sem matar, pode usar:
+  lsof -i:8080
